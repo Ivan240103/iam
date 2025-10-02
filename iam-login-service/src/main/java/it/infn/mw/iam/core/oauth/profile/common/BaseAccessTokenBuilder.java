@@ -20,10 +20,14 @@ import static it.infn.mw.iam.core.oauth.IamOAuth2RequestFactory.AUD_KEY;
 import static it.infn.mw.iam.core.oauth.granters.TokenExchangeTokenGranter.TOKEN_EXCHANGE_GRANT_TYPE;
 import static java.util.Objects.isNull;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.text.ParseException;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Date;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.mitre.oauth2.model.OAuth2AccessTokenEntity;
@@ -34,6 +38,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.oauth2.common.exceptions.InvalidRequestException;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.springframework.security.oauth2.provider.OAuth2Request;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.Maps;
@@ -56,6 +62,8 @@ public abstract class BaseAccessTokenBuilder implements JWTAccessTokenBuilder {
   public static final String SCOPE_CLAIM_NAME = "scope";
   public static final String ACT_CLAIM_NAME = "act";
   public static final String CLIENT_ID_CLAIM_NAME = "client_id";
+  public static final String CNF_CLAIM_NAME = "cnf";
+  public static final String CERT_HASH_FIELD_NAME = "x5t#S256";
   public static final String SPACE = " ";
 
   public static final String SUBJECT_TOKEN = "subject_token";
@@ -158,6 +166,12 @@ public abstract class BaseAccessTokenBuilder implements JWTAccessTokenBuilder {
 
 
     builder.claim(CLIENT_ID_CLAIM_NAME, token.getClient().getClientId());
+    
+    Optional<String> clientCertificateHash = getClientCertificateHash();
+    if (clientCertificateHash.isPresent()) {
+      Map<String, Object> cnfValue = Map.of(CERT_HASH_FIELD_NAME, clientCertificateHash.get());
+      builder.claim(CNF_CLAIM_NAME, cnfValue);
+    }
 
     String audience = null;
 
@@ -191,6 +205,29 @@ public abstract class BaseAccessTokenBuilder implements JWTAccessTokenBuilder {
     if (authentication.getUserAuthentication() instanceof SavedUserAuthentication savedAuth
         && savedAuth.getAdditionalInfo().get("acr") != null) {
       builder.claim("acr", savedAuth.getAdditionalInfo().get("acr"));
+    }
+  }
+
+  private Optional<String> getClientCertificateHash() {
+    String clientCert = ((ServletRequestAttributes) RequestContextHolder.currentRequestAttributes())
+        .getRequest().getHeader("x-ssl-client-cert");
+
+    if (clientCert == null) {
+      return Optional.empty();
+    }
+
+    try {
+      String sanitized = clientCert
+          .replace("-----BEGIN CERTIFICATE-----", "")
+          .replace("-----END CERTIFICATE-----", "")
+          .replaceAll("\\s", "");
+      byte[] derBytes = Base64.getDecoder().decode(sanitized);
+      byte[] sha256 = MessageDigest.getInstance("SHA-256").digest(derBytes);
+      String hash = Base64.getUrlEncoder().withoutPadding().encodeToString(sha256);
+      return Optional.of(hash);
+    } catch (NoSuchAlgorithmException e) {
+      LOG.error(e.getMessage(), e);
+      return Optional.empty();
     }
   }
 }
