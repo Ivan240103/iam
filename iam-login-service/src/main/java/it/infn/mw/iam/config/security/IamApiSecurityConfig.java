@@ -40,6 +40,7 @@ import org.springframework.security.web.context.SecurityContextPersistenceFilter
 
 import it.infn.mw.iam.api.proxy.ProxyCertificatesApiController;
 import it.infn.mw.iam.config.IamProperties;
+import it.infn.mw.iam.config.security.filters.MtlsTokenBindingFilter;
 import it.infn.mw.iam.config.security.IamWebSecurityConfig.UserLoginConfig;
 import it.infn.mw.iam.core.oauth.FormClientCredentialsAuthenticationFilter;
 
@@ -86,6 +87,7 @@ public class IamApiSecurityConfig {
         .and()
           .addFilterBefore(ccFilter, SecurityContextPersistenceFilter.class)
           .addFilterAfter(resourceFilter, SecurityContextPersistenceFilter.class)
+          .addFilterAfter(new MtlsTokenBindingFilter(), OAuth2AuthenticationProcessingFilter.class)
         .cors()
         .and()
         .sessionManagement()
@@ -117,6 +119,7 @@ public class IamApiSecurityConfig {
             handling -> handling.authenticationEntryPoint(userLoginConfig.entryPoint())
               .accessDeniedHandler(new OAuth2AccessDeniedHandler()))
         .addFilterAfter(resourceFilter, SecurityContextPersistenceFilter.class)
+        .addFilterAfter(new MtlsTokenBindingFilter(), OAuth2AuthenticationProcessingFilter.class)
         .sessionManagement(
             management -> management.sessionCreationPolicy(SessionCreationPolicy.NEVER))
         .authorizeRequests(requests -> requests.anyRequest().authenticated())
@@ -149,6 +152,7 @@ public class IamApiSecurityConfig {
             .accessDeniedHandler(new OAuth2AccessDeniedHandler())
         .and()
           .addFilterAfter(resourceFilter, SecurityContextPersistenceFilter.class)
+          .addFilterAfter(new MtlsTokenBindingFilter(), OAuth2AuthenticationProcessingFilter.class)
         .cors()
         .and()
         .sessionManagement()
