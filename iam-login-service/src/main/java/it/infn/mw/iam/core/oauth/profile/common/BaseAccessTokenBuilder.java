@@ -18,13 +18,11 @@ package it.infn.mw.iam.core.oauth.profile.common;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static it.infn.mw.iam.core.oauth.IamOAuth2RequestFactory.AUD_KEY;
 import static it.infn.mw.iam.core.oauth.granters.TokenExchangeTokenGranter.TOKEN_EXCHANGE_GRANT_TYPE;
+import static it.infn.mw.iam.util.x509.X509Utils.getCertificateThumbprint;
 import static java.util.Objects.isNull;
 
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.text.ParseException;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.Date;
 import java.util.Map;
 import java.util.Optional;
@@ -64,6 +62,7 @@ public abstract class BaseAccessTokenBuilder implements JWTAccessTokenBuilder {
   public static final String CLIENT_ID_CLAIM_NAME = "client_id";
   public static final String CNF_CLAIM_NAME = "cnf";
   public static final String CERT_HASH_FIELD_NAME = "x5t#S256";
+  public static final String CLIENT_CERT_HEADER = "X-SSL-Client-cert";
   public static final String SPACE = " ";
 
   public static final String SUBJECT_TOKEN = "subject_token";
@@ -167,7 +166,7 @@ public abstract class BaseAccessTokenBuilder implements JWTAccessTokenBuilder {
 
     builder.claim(CLIENT_ID_CLAIM_NAME, token.getClient().getClientId());
     
-    Optional<String> clientCertificateHash = getClientCertificateHash();
+    Optional<String> clientCertificateHash = getClientCertificateThumbprint();
     if (clientCertificateHash.isPresent()) {
       Map<String, Object> cnfValue = Map.of(CERT_HASH_FIELD_NAME, clientCertificateHash.get());
       builder.claim(CNF_CLAIM_NAME, cnfValue);
@@ -208,26 +207,14 @@ public abstract class BaseAccessTokenBuilder implements JWTAccessTokenBuilder {
     }
   }
 
-  private Optional<String> getClientCertificateHash() {
+  private Optional<String> getClientCertificateThumbprint() {
     String clientCert = ((ServletRequestAttributes) RequestContextHolder.currentRequestAttributes())
-        .getRequest().getHeader("x-ssl-client-cert");
+        .getRequest().getHeader(CLIENT_CERT_HEADER);
 
-    if (clientCert == null) {
+    if (clientCert == null || clientCert.isBlank()) {
       return Optional.empty();
     }
 
-    try {
-      String sanitized = clientCert
-          .replace("-----BEGIN CERTIFICATE-----", "")
-          .replace("-----END CERTIFICATE-----", "")
-          .replaceAll("\\s", "");
-      byte[] derBytes = Base64.getDecoder().decode(sanitized);
-      byte[] sha256 = MessageDigest.getInstance("SHA-256").digest(derBytes);
-      String hash = Base64.getUrlEncoder().withoutPadding().encodeToString(sha256);
-      return Optional.of(hash);
-    } catch (NoSuchAlgorithmException e) {
-      LOG.error(e.getMessage(), e);
-      return Optional.empty();
-    }
+    return getCertificateThumbprint(clientCert);
   }
 }
