@@ -17,6 +17,7 @@ package it.infn.mw.iam.config.security.filters;
 
 import static it.infn.mw.iam.core.oauth.profile.common.BaseAccessTokenBuilder.CERT_HASH_FIELD_NAME;
 import static it.infn.mw.iam.core.oauth.profile.common.BaseAccessTokenBuilder.CLIENT_CERT_HEADER;
+import static it.infn.mw.iam.core.oauth.profile.common.BaseAccessTokenBuilder.CLIENT_HEADER;
 import static it.infn.mw.iam.core.oauth.profile.common.BaseAccessTokenBuilder.CNF_CLAIM_NAME;
 import static it.infn.mw.iam.util.x509.X509Utils.getCertificateThumbprint;
 
@@ -39,23 +40,20 @@ import com.nimbusds.jwt.SignedJWT;
 public class MtlsTokenBindingFilter extends OncePerRequestFilter {
 
   private static final String AUTH_HEADER = "Authorization";
-  private static final String X_CLIENT_HEADER = "X-Client";
-  private static final String CLIENT_IDENTITY = "dashboard-mtls";
 
   @Override
   protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
-    FilterChain chain) throws ServletException, IOException {
+      FilterChain chain) throws ServletException, IOException {
 
     try {
-      // perform this check only for dashboard
-      String identifier = request.getHeader(X_CLIENT_HEADER);
-      if (identifier == null || !identifier.equals(CLIENT_IDENTITY)) {
+      String client = request.getHeader(CLIENT_HEADER);
+      if (client == null || !client.equals("dashboard-mtls")) {
         chain.doFilter(request, response);
         return;
       }
 
       String presentedCert = request.getHeader(CLIENT_CERT_HEADER);
-      
+
       if (presentedCert == null || presentedCert.isBlank()) {
         throw new InsufficientAuthenticationException("Missing mTLS certificate");
       }
@@ -85,10 +83,12 @@ public class MtlsTokenBindingFilter extends OncePerRequestFilter {
           if (!expectedThumbprint.equals(presentedThumbprint.get())) {
             throw new InsufficientAuthenticationException("mTLS certificate thumbprint mismatch");
           }
+        } else {
+          throw new InsufficientAuthenticationException("Missing certificate thumbprint in token");
         }
 
       } catch (ParseException e) {
-        throw new InsufficientAuthenticationException("Invalid access token format", e);
+        throw new InsufficientAuthenticationException("Invalid access token format");
       }
 
       chain.doFilter(request, response);
