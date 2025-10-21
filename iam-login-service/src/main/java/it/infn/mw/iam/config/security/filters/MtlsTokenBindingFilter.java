@@ -17,7 +17,6 @@ package it.infn.mw.iam.config.security.filters;
 
 import static it.infn.mw.iam.core.oauth.profile.common.BaseAccessTokenBuilder.CERT_HASH_FIELD_NAME;
 import static it.infn.mw.iam.core.oauth.profile.common.BaseAccessTokenBuilder.CLIENT_CERT_HEADER;
-import static it.infn.mw.iam.core.oauth.profile.common.BaseAccessTokenBuilder.CLIENT_HEADER;
 import static it.infn.mw.iam.core.oauth.profile.common.BaseAccessTokenBuilder.CNF_CLAIM_NAME;
 import static it.infn.mw.iam.util.x509.X509Utils.getCertificateThumbprint;
 
@@ -40,6 +39,7 @@ import com.nimbusds.jwt.SignedJWT;
 public class MtlsTokenBindingFilter extends OncePerRequestFilter {
 
   private static final String AUTH_HEADER = "Authorization";
+  private static final String CLIENT_HEADER = "X-Client";
 
   @Override
   protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -47,6 +47,7 @@ public class MtlsTokenBindingFilter extends OncePerRequestFilter {
 
     try {
       String client = request.getHeader(CLIENT_HEADER);
+      
       if (client == null || !client.equals("dashboard-mtls")) {
         chain.doFilter(request, response);
         return;

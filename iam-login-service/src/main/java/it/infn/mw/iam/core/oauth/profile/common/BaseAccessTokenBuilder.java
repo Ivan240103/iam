@@ -21,7 +21,6 @@ import static it.infn.mw.iam.core.oauth.granters.TokenExchangeTokenGranter.TOKEN
 import static it.infn.mw.iam.util.x509.X509Utils.getCertificateThumbprint;
 import static java.util.Objects.isNull;
 
-import java.io.IOException;
 import java.text.ParseException;
 import java.time.Instant;
 import java.util.Date;
@@ -30,7 +29,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 import org.mitre.oauth2.model.OAuth2AccessTokenEntity;
 import org.mitre.oauth2.model.SavedUserAuthentication;
@@ -67,7 +65,6 @@ public abstract class BaseAccessTokenBuilder implements JWTAccessTokenBuilder {
   public static final String CNF_CLAIM_NAME = "cnf";
   public static final String CERT_HASH_FIELD_NAME = "x5t#S256";
   public static final String CLIENT_CERT_HEADER = "X-SSL-Client-cert";
-  public static final String CLIENT_HEADER = "X-Client";
   public static final String SPACE = " ";
 
   public static final String SUBJECT_TOKEN = "subject_token";
@@ -215,23 +212,11 @@ public abstract class BaseAccessTokenBuilder implements JWTAccessTokenBuilder {
   private Optional<String> getClientCertificateThumbprint() {
     HttpServletRequest request =
         ((ServletRequestAttributes) RequestContextHolder.currentRequestAttributes()).getRequest();
-    HttpServletResponse response =
-        ((ServletRequestAttributes) RequestContextHolder.currentRequestAttributes()).getResponse();
-
-    String client = request.getHeader(CLIENT_HEADER);
-
-    if (client == null || !client.equals("dashboard-mtls")) {
-      return Optional.empty();
-    }
     
     String clientCert = request.getHeader(CLIENT_CERT_HEADER);
 
     if (clientCert == null || clientCert.isBlank()) {
-      try {
-        response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Missing client certificate");
-      } catch (IOException e) {
-        return Optional.empty();
-      }
+      return Optional.empty();
     }
 
     return getCertificateThumbprint(clientCert);
