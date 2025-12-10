@@ -75,6 +75,7 @@ public class X509Utils {
     String sanitized = cert.replace("-----BEGIN CERTIFICATE-----", "")
       .replace("-----END CERTIFICATE-----", "")
       .replaceAll("\\s", "");
+    
     try {
       byte[] der = Base64.getDecoder().decode(sanitized);
       byte[] sha256 = MessageDigest.getInstance("SHA-256").digest(der);
